@@ -1,5 +1,5 @@
 locals {
-    identifier               = "rds1"
+    identifier               = "rds2"
     allocated_storage        = 10
     engine                   = "mariadb"
     engine_version           = "10.6"
@@ -20,7 +20,7 @@ locals {
     # PITR stuff
     source_db_instance_identifier            = null
     source_db_instance_automated_backups_arn = null
-    use_latest_restorable_time               = true
+    use_latest_restorable_time               = false
     restore_time                             = null
 }
 

@@ -41,6 +41,53 @@ To cleanup the rds2 instance...
 terraform destroy
 ```
 
+# Promote a slave to master / replica to primary
+
+The goals of this section to to take a Multi-AZ setup, with read-only slaves, promote one slave to become the new master, and maintain this state in Terraform, returning it to the "default" setup. The default setup here is considered to be a Multi-AZ DB Instance with 3 read-only slaves.
+
+First creating a starting point....
+
+```bash
+terraform apply
+```
+
+In the web console...
+
+* RDS > Databases
+* Select the slave to promote, i.e. rds1-slave-1
+* Actions > Promote > Promote read replica
+
+The status of the slave will move to "Modifying" and it will move out of the master/slave hierachy. This process take a fe w minutes to complete. Delete the other db instances in the setup as they will not be required again. Ensure the rds1 instance has completed deletion before proceeding (Optional call it rds2 to make the process a bit quicker, don't forget to update the TF code to reflect this)..
+
+Next, select the new master db instance, i.e. rds1-slave-1 and fix the name
+
+* Modify
+* In the field "DB Instance Identifier", update the name to match the master instance in the Terraform code, i.e. rds1
+* Click Continue
+* Select "Apply immediately"
+* Click "Modify DB Instance"
+
+Next remove the DB Instances from the TF state...
+
+```bash
+terraform state rm aws_db_instance.rds1
+terraform state rm aws_db_instance.rds_slave
+```
+
+Import the state of rds2...
+
+```bash
+terraform import aws_db_instance.rds1 rds2
+```
+
+Next perform a `terraform apply` to update the state of our MariaDB Cluster. This will make the master instance Multi-AZ, create 3 read-only slaves and then update the SSM Parameter as appropriate.
+
+```bash
+terraform apply
+```
+
+This will take sometime to complete but at the end we should have the same setup as we started with.
+
 
 # SSM Parameters
 
@@ -55,4 +102,5 @@ terraform destroy
 * Root password is hard-coded in this module. Fix this for any non-trivial usage.
 * In order for the slaves to be created automatic backups must be enabled on the master.
 * Disassociating a backup does not delete it but it might take some time to appear in RDS > Automated backups > Retained backups. Ensure that delete_automated_backups is set to false before deleting the RDS instance.
-* We want to support PITR as well as snapshot restore in this module. The restore_to_point_in_time block needs to be dynamic for this to work properly. Creating the block with all null values causes terraform to crash. 
+* We want to support PITR as well as snapshot restore in this module. The restore_to_point_in_time block needs to be dynamic for this to work properly. Creating the block with all null values causes terraform to crash.
+* Further work can be done here involving delayed slaves and recovering from a user error [Recover from a disaster with delayed replication in Amazon RDS for MySQL](https://aws.amazon.com/blogs/database/recover-from-a-disaster-with-delayed-replication-in-amazon-rds-for-mysql/) *UPDATE" This is handles slightly differently in MariaDB, see [Working with MariaDB read replicas](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_MariaDB.Replication.ReadReplicas.html)
